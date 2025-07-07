@@ -1,6 +1,7 @@
 \documentclass{article}
 \usepackage{amsmath}
 \usepackage{url}
+\usepackage{graphicx}
 \title{Fitting ODE solutions to noisy data by collapsing towards to manifold of solutions}
 \author{Harry Braviner}
 
@@ -24,6 +25,17 @@ The motivation for everything in this document is that I would like to be able t
 Doing so requires%
 \footnote{It also requires modifying PySR to output functions of $t$, $x(t)$, and $\dot{x}(t)$, but I believe that is comparatively straightforward: have PySR treat $t$, $x(t)$ and $\dot{x}(t)$ as three dependent variables.}
 evaluating the goodness-of-fit of each $f$ to the data, and this work is intended to provide a method of doing so.
+
+The essential idea I shall outline is this: We will approximate the (infinite dimensional) space of function on $\left[t_{\mathrm{start}}, t_{\mathrm{end}} \right]$ by an $N$-dimensional discretization
+$$
+\left( \hat{x}(t_0), \hat{x}(t_1), \dots, \hat{x}(t_{N-1} \right)
+$$
+Within this $N$-dimensional space there is some subspace (the \emph{solution space}) that satisfies the ODE.%
+\footnote{
+And for a one-dimensional second-order ODE this subspace should generally by 2-dimensional.
+}
+\textbf{We shall collapse the $N$-dimensional discretization onto the solution space \emph{along the path minimizing the MSE of the data}.}
+I shall be more precise about what this means in section \ref{sec:method}, after briefly reviewing other work and ideas.
 
 \subsection{Previous work}
 
@@ -79,9 +91,48 @@ Many physical systems have a simple expression in terms of ODEs, but no closed f
 
 \subsection{Alternative methods}
 
+In this section I'm going to outline some alternative methods that seem attractive.
+
+\subsubsection{Extracting $\dot{x}(t)$ from the data}
+
+Several of the papers described above evaluate $f$ directly as the degree of disagreement between $f(x(t))$ and $\dot{x}(t)$ as measured from the data.
+Even if the data has zero noise, the descretization of the time-sampling can cause considerable error in the approximation (see figure \ref{fig:deriv_from_samples}), and the addition of noise makes the error much worse (see figure \ref{fig:deriv_from_noisy_samples}).
+The method I outline in the note should be able to handle much sparser and noisier data.
+
+\begin{figure}
+\includegraphics{images/alternative_methods/deriv_from_samples.png}
+\centering
+\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$} from sampled data. There is an error, with the derivative being shifted left, even though the points are densely spaced.
+\label{fig:deriv_from_samples}
+\end{figure}
+
+\begin{figure}
+\includegraphics{images/alternative_methods/deriv_from_noisy_samples.png}
+\centering
+\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$} from sampled data with Gaussian noise with $\sigma = 0.05$. The error is considerably worse than in figure \ref{fig:deriv_from_samples}.
+\label{fig:deriv_from_noisy_samples}
+\end{figure}
+
 %% FIXME - shooting and sweeping method. Downsides: double well example. High-dimensional search space.
 %% FIXME - treating the first and last points as 'correct' and performing relaxation. Noise is an issue. double-well example also provides a case where it works poorly.
 %% FIXME - smoothing over the points with some kind of kernel. Necessitates a choice of smoothing length-scale.
+
+
+\section{Collapse method in detail}
+\label{sec:method}
+
+%%FIXME
+%and the derivatives by
+%$$
+%\hat{\ddot{x}}(t_i) = h^{-2} \left( \hat{x}(t_{i-1}) - 2 \hat{x}(t_i) + \hat{x}(t_{i+1}) \right)
+%$$
+%and%
+%\footnote{
+%We could instead use the backward derivative, $\hat{\dot{x}}(t_i) = h^{-1} \left( \hat{x}(t_{i}) -  \hat{x}(t_{i-1})\right)$. I do not think this should make a difference, but I have added an option to do so in my code.
+%}
+%$$
+%\hat{\dot{x}}(t_i) = h^{-1} \left( \hat{x}(t_{i+1}) -  \hat{x}(t_i)\right)
+%$$
 
 \bibliographystyle{plain}
 \bibliography{ode_collapser}
