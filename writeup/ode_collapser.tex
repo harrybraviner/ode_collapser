@@ -1,0 +1,63 @@
+\documentclass{article}
+\usepackage{amsmath}
+\title{Fitting ODE solutions to noisy data by collapsing towards to manifold of solutions}
+\author{Harry Braviner}
+
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Statement of the problem}
+
+We have a collection of datapoints, $\left\{ \tilde{x}(t_i) \right\}$, and an ODE, $\mathcal{D}\left[ x; t \right] = 0$. We believe that the datapoints \emph{may be} noisy samples from \emph{some} solution to this ODE, but we do \emph{not} have a guess for the intial or bounday conditions. How can we evaluate the goodness-of-fit of this ODE (which we probably cannot solve analytically, and which we do not have initial conditions for) to these datapoints?
+
+Let's simplify the problem space by making two big restrictions:
+\begin{enumerate}
+\item We only consider second-order ODEs. i.e. the differential operator $\mathcal{D}\left[x ; t \right]$ has the form $\ddot{x}(t) - f\left(x(t), \dot{x}(t), t\right)$.
+\item The datapoints are samples from an evenly-spaced discrete grid of times, $t_0, t_1, \dots, t_{N-1}$, where $t_i - t_{i-1} = h$. The samples themselves need not be evenly spaced: e.g. out dataset could consist of $\left\{\tilde{x}(t_0), \tilde{x}(t_1), \tilde{x}(t_2), \tilde{x}(t_50)\right\}$. We also assume that we have at most one samples from any $t_i$. i.e. we never have multiple samples from the same time with different noise components.
+\end{enumerate}
+
+I am not concerned at this point about where $f$ comes from.
+The motivation for everything in this document is that I would like to be able to modify PySR to search for such an $f$.
+Doing so requires%
+\footnote{It also requires modifying PySR to output functions of $t$, $x(t)$, and $\dot{x}(t)$, but I believe that is comparatively straightforward: have PySR treat $t$, $x(t)$ and $\dot{x}(t)$ as three dependent variables.}
+evaluating the goodness-of-fit of each $f$ to the data, and this work is intended to provide a method of doing so.
+
+\subsection{Previous work}
+
+In \cite{kronberger2019identification} the authors consider symbolic regression of first-order autonomous dynamical systems:
+\begin{align}
+\dot{x}_1(t) &= f_1\left(x_1, \dots, x_n\right) \nonumber \\
+\dot{x}_2(t) &= f_2\left(x_1, \dots, x_n\right) \nonumber \\
+ & \vdots \nonumber \\
+\dot{x}_n(t) &= f_n\left(x_1, \dots, x_n\right) \nonumber \\
+\end{align}
+The candidate system, $\left( f_1, f_2, \dots, f_n\right)$, is the output of a genetic algorithm, although it does not appear to be PySR.
+The authors use two methods of evaluating the goodness-of-fit of the ODE to the datapoints:
+\begin{enumerate}
+\item Using the approximate derivative values as a target, i.e.
+$$
+\mathrm{Loss}(f) = \sum_{i, j} \bigg(f_i\left( x_1(t_j), \dots, x_n(t_j) \right) - \big(x_i(t_{j+1}) - x_i(t_j)\big) \bigg)^2
+$$
+\item Integrating from the initial values $(x_1(t_0), ..., x_n(t_0))$ using a numerical ODE solver.
+\end{enumerate}
+The method of \cite{kronberger2019identification} does not appear to allow for noise in the measurements.
+The results section shows the method being less successful on motion-captured data vs simulated data, and this supports my belief that this method does not tolerate measurement noise well.
+They also assume that their datapoints are evenly spaced in time, although I'm not sure this is necessary. However, for method (1) to work, it is necessary for the spacing between the datapoints to be such that the numerical gradient is a good approximation to the true gradient.
+
+%% FIXME - https://github.com/MilesCranmer/PySR/discussions/568
+%% FIXME - https://medium.com/data-science/discovering-differential-equations-with-physics-informed-neural-networks-and-symbolic-regression-c28d279c0b4d
+
+\subsection{Alternative methods}
+
+%% FIXME - shooting and sweeping method. Downsides: double well example. High-dimensional search space.
+%% FIXME - treating the first and last points as 'correct' and performing relaxation. Noise is an issue. double-well example also provides a case where it works poorly.
+%% FIXME - smoothing over the points with some kind of kernel. Necessitates a choice of smoothing length-scale.
+
+\bibliographystyle{plain}
+\bibliography{ode_collapser}
+
+\end{document}
+
+
