@@ -27,6 +27,10 @@ def collapse_to_solution(
     if not isinstance(x_samples, torch.Tensor):
         x_samples = torch.tensor(x_samples, requires_grad=False)
 
+    # I believe this is necessary to avoid errors if we ever move the tensors to the gpu
+    # (and to avoid a deprecation warning even if they are on the cpu).
+    rhs = torch.compile(rhs)
+
     # Default transformation
     if transformation_x2z is None:
         # The default option transforms the problem into gradient-space plus a constant.
@@ -45,10 +49,10 @@ def collapse_to_solution(
                 w_ode = 0.01
             elif it >= 0.9 * n_iterations:
                 # Final 90% of steps: optimize mainly for satisfying the ODE
-                w_ode = 0.8
+                w_ode = 1.0
             else:
                 # Linear ramp-up of w_ODE in between these iterations
-                w_ode = 0.01 + 0.79 * (it - 0.1 * n_iterations) / (0.8 * n_iterations)
+                w_ode = 0.01 + 0.99 * (it - 0.1 * n_iterations) / (0.8 * n_iterations)
             return w_ode
 
     # Invert the transformation matrix. We will need this repeatedly later.
