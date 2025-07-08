@@ -1,8 +1,9 @@
 \documentclass{article}
+\usepackage{fullpage}
 \usepackage{amsmath}
 \usepackage{url}
 \usepackage{graphicx}
-\title{Fitting ODE solutions to noisy data by collapsing towards to manifold of solutions}
+\title{Fitting ODE solutions to noisy data by collapsing onto the manifold of solutions}
 \author{Harry Braviner}
 
 \date{\today}
@@ -94,31 +95,115 @@ Many physical systems have a simple expression in terms of ODEs, but no closed f
 In this section I'm going to outline some alternative methods that seem attractive.
 
 \subsubsection{Extracting $\dot{x}(t)$ from the data}
+\label{sec:alternate_extracting_xdot}
 
-Several of the papers described above evaluate $f$ directly as the degree of disagreement between $f(x(t))$ and $\dot{x}(t)$ as measured from the data.
-Even if the data has zero noise, the descretization of the time-sampling can cause considerable error in the approximation (see figure \ref{fig:deriv_from_samples}), and the addition of noise makes the error much worse (see figure \ref{fig:deriv_from_noisy_samples}).
-The method I outline in the note should be able to handle much sparser and noisier data.
+Several of the papers described above evaluate $f$ directly as the degree of disagreement between $f(x(t))$ and $\dot{x}(t)$ as approximated by forward differences from the data samples.
+Even if the samples have zero noise, the descretization of the time-sampling can cause considerable error in the approximation (see figure \ref{fig:deriv_from_samples}), and the addition of noise makes the error much worse (see figure \ref{fig:deriv_from_noisy_samples}).
+The method I outline in the note should be able to handle much sparser and noisier samples.
 
 \begin{figure}
 \includegraphics{images/alternative_methods/deriv_from_samples.png}
 \centering
-\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$} from sampled data. There is an error, with the derivative being shifted left, even though the points are densely spaced.
+\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$ from sampled data. There is some error, with the derivative being shifted left, even though the points are densely spaced.}
 \label{fig:deriv_from_samples}
 \end{figure}
 
 \begin{figure}
 \includegraphics{images/alternative_methods/deriv_from_noisy_samples.png}
 \centering
-\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$} from sampled data with Gaussian noise with $\sigma = 0.05$. The error is considerably worse than in figure \ref{fig:deriv_from_samples}.
+\caption{Forward numerical derivative, $\left(x(t_{i+1}) - x(t_i)\right)/\left(t_{i+1} - t_i\right)$ from sampled data with Gaussian noise with $\sigma = 0.05$. The error is considerably worse than in figure \ref{fig:deriv_from_samples}.}
 \label{fig:deriv_from_noisy_samples}
 \end{figure}
 
-%% FIXME - shooting and sweeping method. Downsides: double well example. High-dimensional search space.
-%% FIXME - treating the first and last points as 'correct' and performing relaxation. Noise is an issue. double-well example also provides a case where it works poorly.
-%% FIXME - smoothing over the points with some kind of kernel. Necessitates a choice of smoothing length-scale.
+\subsection{Smoothing the data with a kernel}
 
+Smoothing the datapoints with some kernel function (e.g. a rolling average window) would go some way toward addressing the issue of noise in the dataset.
+PySR supports something similar to this feature via the \texttt{denoise} option, which first fits a Gaussian process to the data.
+This could be modified to also output the gradient of the fitted process.
+One downside of this method is that it requires the choice of hyperparameters for the kernel of the Gaussian process (I don't think PySR exposes these choices to the end user, and I'm not sure if it has some clever way to pick them).
 
-\section{Collapse method in detail}
+A second, more subtle problem exists with both this method and that of section \ref{sec:alternate_extracting_xdot}. If the data sampling is sufficiently irregular, checking that the candidate ODE is obeyed locally is \emph{not} the same as verifying that it is obeyed globally.
+This is illustrated in figure \ref{fig:gp_fitting}.
+A Gaussian process is fitted to two clusters of sampled datapoints.
+Comparing the second derivative of the Gaussian process to the right hand side of $\ddot{x}(t) = -(2\pi10)^2 x(t)$ gives excellent agreement, and we might conclude that this data comes from a 10Hz harmonic oscillator.
+But it does not.
+In the upper plot of figure \ref{fig:gp_fitting} we also show two solutions for a 10Hz harmonic oscillator, with different initial conditions.
+It is clear that one cluster of sampled datapoints fits one set of initial conditions, and the other cluster fits the other set.
+But the whole cluster as a single timeseries does not fit this candidate ODE for any set of initial condtions.
+
+\begin{figure}
+\includegraphics{images/alternative_methods/gp_fitting.png}
+\centering
+\caption{A Gaussian process is fitted through sampled datapoints (top plot), and the second derivative of this process is compared to the right-hand side of the candidate equation $\ddot{x}(t) = -(2\pi10)^2 x(t)$ (bottom plot) where excellent agreement is seen (the relative error is a few parts-per-thousand).
+However, the two clusters of datapoints come from solutions of this ODE that have different initial conditions, being $180^{\circ}$ out of phase (dotted lines on the top plot).
+}
+\label{fig:gp_fitting}
+\end{figure}
+
+We should note that this is not an artifact of the Gaussian process.
+This issue would arise even if we had access to measured values of $\ddot{x}(t)$ at the sample points.
+
+One could object that I have cheated by only evaluating the Gaussian process and its second derivative at the sampled points.
+Should we have compared $\hat{x}$ from the Gaussian process to its second derivative over the whole range?
+I believe not.
+Doing so here would show serious divergence from the ODE $\ddot{x} = -(2\pi10)^2 x$ in the middle of the domain.
+\emph{But it would also do so if the datapoints were drawn from the same solution.}
+We would mark \emph{any} candidate ODE as a poor fit to data with large gaps in its time-sampling.
+The Gaussian process only helps us \emph{interpolate}; it is not reasonable to expect it to also \emph{extrapolate}.
+
+\subsection{Sweep-and-shoot methods}
+
+If we knew the intial conditions for our dataset, we could integrate from the earliest point using a numerical ODE solver and compare the numerically integrated solution, $\hat{x}(t)$, to the sampled solution $\tilde{x}(t)$, at every later sampling time.
+This works well if the initial conditions are known with zero noise.
+In practice, noise may be present, and this method privileges the first point (by treating it as noiseless) in a way that we would probably prefer to avoid.
+In the case of second order ODEs, we need to either have direct measurement of $\tilde{\dot{x}}$ or use the first two points to approximate it.
+
+In the absence of noiseless initial conditions, we can `sweep' over plausible values and integrate the ODE forward in time (`shoot') for each set of initial conditions.
+The noisy values for the first $x$ and $\dot{x}$ could be used as a point around which to centre the sweep.
+
+This approach is viable for a low dimensional problem, but will become exponentially expensive as the number of dimensions increases.
+If we choose to sweep over $10$ values for each inital condition for a 3 dimensional second order ODE ($x$, $\dot{x}$, $y$, $\dot{y}$, $z$, $\dot{z}$) we would have $10^6$ combinations to try.
+
+Even in low-dimensional problem, sweep-and-shoot can struggle to evaluate whether the ODE is a good fit to the data. Consider the system
+$$
+\ddot{x}(t) = - x(t)^3 + a^2 x(t) - \nu \dot{x}(t)
+$$
+This system is a double-well potential with stable fixed points at $x = \pm a$ (with small oscillation frequencies of $\sqrt{2 a^2 - \nu^2/4}$) and an unstable fixed point at $x=0$ (with $x(t) \approx A_0 \exp(a (t - t_0)$ around this point).
+
+\begin{figure}
+\includegraphics{images/alternative_methods/double_well.png}
+\centering
+\caption{
+Three (numerically integrated) solutions to $\ddot{x}(t) = -x(t)^2 + a^2 x(t) - \nu \dot{x}(t)$ for $a = 6\pi / \sqrt{2}$ and $\nu = 3$.
+Note that the initial conditions have identical velocities and differ very small values of the $x$ coordinate.
+}
+\label{fig:double_well}
+\end{figure}
+
+Figure \ref{fig:double_well} shows three solutions to this system, for very similar initial conditions.
+Suppose that our experiment had evolved along the dashed, orange curve ($x_0 = 10^{-11}$, $v_0 = 0$), and we had samples from it.
+If we were performing a sweep-and-shoot search, we might well have integrated from $x_0 = 10^{-3}$, produced the blue curve, and measured this to have high MSE relative to our data.
+We would then step our initial condition to our next point, $x_0 = -10^{-3}$, and produce the green curve, having an even higher MSE.
+We would reject the candidate ODE, despite it being completely correct!
+
+One might object to this, saying that clearly the sweep should be performed in log-space since we are so close to $x=0$.
+This is true, but we know this because we are applying our intelligence and knowledge of the underlying ODE.
+The location of an unstable fixed point will not always be at zero.
+To first locate the fixed points of the candidate ODE and treat them as special in a sweep-and-shoot procedure would be considerable additional algorithmic complexity.
+(In fact, taking the initiative to do so might be a good desideratum of an AI physicist!)
+
+\subsection{Relaxation methods}
+
+The method I describe below will look a bit like a relaxation method (see \cite{wikipediaRelaxationMethod}), and one might wonder if some variation of this could be used to achieve faster convergence.
+This might be the case, but if so I haven't yet figured out how.
+
+The relaxation method seems to require fixed, known end-points.
+i.e. it requires boundary conditions.
+We could take the earliest and last sampled datapoints, and use these as boundary conditions.
+However, that would (just like shooting from the first point) elevate these points in significance by assuming that they have no measurement noise.
+We would also have a version of the problem indicated in figure \ref{fig:double_well}: the blue and orange curves have extremely similar boundary conditions if $t_{\mathrm{start}}$ is sufficiently early, $t_{\mathrm{end}}$ significantly late.
+
+\section{The Collapse Method}
 \label{sec:method}
 
 %%FIXME
