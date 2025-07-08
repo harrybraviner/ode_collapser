@@ -283,6 +283,105 @@ and varying $W_{\mathrm{ODE}}$ from close to zero at the start training to close
 Schematically, we first proceed to the blue cross (exactly fitting the data) in figure \ref{fig:disc_space_viz}, and then to the green curve (the solution space).
 Due to going via the blue cross, we should arrive at the solid yellow circle (the global minimum of $L_{\mathrm{data}}$ on the solution space).
 
+\subsection{Reducing the stiffness of the optimization problem}
+
+After implementing this method I initially tried it on an extremely simple system
+$$
+\ddot{x}(t) = F
+$$
+for constant $F$.
+
+The method described above struggled to produce a good fit to this system at all.
+Simple gradient descent required incredibly small step sizes ($\sim 10^{-7}$) otherwise NaNs would appear in the solution.
+Reducing the step size sufficiently that this no longer occurred resulted in solutions that satisfied the ODE, but were a poor fit to the data, even with zero noise.
+
+At first I suspected the system was getting stuck in a local optimum, but this isn't possible - with constant acceleration the discretized system is convex.
+A little further investigation revealed that the problem was likely due to the condition number%
+\footnote{
+The Hessian of $L_{\mathrm{ODE}}$ actually has two zero eigenvalues (corresponding to the tangent space of the solution space). When I say `condition number' I mean the ratio of the largest eigenvalue to the smallest non-zero eigenvalue.
+}
+ of the Hessian of $L_{\mathrm{ODE}}$ being very large.%
+\footnote{
+During my time at Layer 6 I used to ask prospective colleagues an interview question about the maximum learning rate they could use on a loss function $L(x, y) = \frac{1}{2} \left( a x^2 + b y^2 \right)$ for $ a \gg b$.
+I suspect that me spending several hours debugging what amounts to a somewhat obfuscated version of the same problem is down to karma.
+}
+
+Since this simple version of the problem (constant acceleration) is the optimization of a quadratic function, I switched to \texttt{LBFGS}, an approximate quadratic optimizer provided by PyTorch that does not require explicitly computing second order derivative.
+This partially solved the problem, in that it worked well for small numbers of grid points (10), but still worked very poorly on moderately sized grids (100 points).
+In the latter case the ODE would typically be satified, but the solution would visually be a long way from the sample points.
+
+If we directly compute the Hessian of $L_{\mathrm{ODE}}$ for this problem, we find
+$$
+\left[\frac{\partial^2 (h^3 L_{\mathrm{ODE}})}{\partial \hat{x}_i \partial \hat{x}_j} \right] = \begin{pmatrix}
+1 & -2 & 1 & 0 & 0 & 0 & 0 & \cdots & 0 \\
+-2 & 5 & -4 & 1 & 0 & 0 & 0 & \cdots & 0 \\
+1 & -4 & 6 & -4 & 1 & 0 & 0 & \cdots & 0 \\
+0 & 1 & -4 & 6 & -4 & 1 & 0 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \vdots \\
+0 & \cdots & 0 & 1 & -4 & 6 & -4 & 1 & 0 \\
+0 & \cdots & 0 & 0 & 1 & -4 & 6 & -4 & 1 \\
+0 & \cdots & 0 & 0 & 0 & 1 & -4 & 5 & -2 \\
+0 & \cdots & 0 & 0 & 0 & 0 & 1 & -2 & 1 \\
+\end{pmatrix}
+$$
+
+For 10 dimensions, this matrix has a condition number of
+$$
+\frac{\lambda_{\mathrm{max}}}{\lambda_{\mathrm{min}, \ne 0}} \approx \frac{7.55}{0.0253} \approx 299 \,.
+$$
+For 100 dimensions, the condition number is
+$$
+\frac{\lambda_{\mathrm{max}}}{\lambda_{\mathrm{min}, \ne 0}} \approx \frac{8.00}{2.50\times 10^{-6}} \approx 3.2 \times 10^6 \,.
+$$
+
+At this point I decided to try switching coordinates, defining
+\begin{align}
+\label{eq:zdef}
+z_0 & = x_0 \nonumber \\
+z_i & = x_i - x_{i-1} \, \mathrm{for} \, i \ge 1 
+\end{align}
+i.e. we work in gradient space, rather than position space.
+
+In these coordinates the loss becomes 
+$$
+L_{\mathrm{ODE}} = \frac{1}{2} h \sum_{i=1}^{N-2} \left( h^{-2}(z_{i+1} - z_i) - F \right)^2 
+$$
+and the Hessian becomes
+$$
+\left[\frac{\partial^2 (h^3 L_{\mathrm{ODE}})}{\partial z_i \partial z_j} \right] = \begin{pmatrix}
+0 & 0 & 0 & 0 & 0 & \cdots & 0 \\
+0 & 1 & -1 & 0 & 0 & \cdots & 0 \\
+0 & -1 & 2 & -1 & 0 & \cdots & 0 \\
+0 & 0 & -1 & 2 & -1 & \cdots & 0 \\
+\vdots & \vdots & \vdots & \vdots & \vdots & \vdots & \vdots \\
+0 & \cdots & -1 & 2 & -1 & 0 & 0 \\
+0 & \cdots & 0 & -1 & 2 & -1 & 0 \\
+0 & \cdots & 0 & 0 & -1 & 2 & -1 \\
+0 & \cdots & 0 & 0 & 0 & -1 & 1 \\
+\end{pmatrix}
+$$
+
+This is considerably more benign. For 100 dimensions, the condition number of the Hessian with respect to the $z$ coordinates is
+$$
+\frac{\lambda_{\mathrm{max}}}{\lambda_{\mathrm{min}, \ne 0}} \approx 4.0 \times 10^3 \,.
+$$
+In figure \ref{fig:condition_numbers} we can see that the condition number with this transformation does continue to increase with the number of dimensions (i.e. with finer discretization of the time domain), but is clearly less stiff than the untransformed problem.
+
+\begin{figure}
+\includegraphics{images/method/condition_numbers.png}
+\centering
+\caption{
+Condition number, $\lambda_{\mathrm{max}} / \lambda_{\mathrm{min}, \ne 0}$, for the Hessian of $L_{\mathrm{ODE}}$ with respect to the original variables, $\hat{x}_i$, and the $z_i$ defined by \eqref{eq:zdef}.
+}
+\label{fig:condition_numbers}
+\end{figure}
+
+In these coordinates, with a grid size of $N=100$, the optimization process appears to work.
+I have not tested larger grid sizes yet.
+One question that I do not have an answer to is whether there is a better coordinate transformation that could be applied.
+My implementation uses the transformation \eqref{eq:zdef} by default, but does allow for any other linear transformation to be specified.
+
+
 %%FIXME
 %and the derivatives by
 %$$
