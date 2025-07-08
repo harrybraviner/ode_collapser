@@ -506,11 +506,14 @@ By decreasing $W_{\mathrm{ODE}}$ to $10^{-4}$ I was able to obtain the fits show
 
 The results of figure \ref{fig:double_well_collapser} do show good fits.
 The purple solution has been found almost exactly, and the blue has found a solution that matches the data very closely, even though it does not match the underlying solution.
-The red solution is clearly a little lacking, but still appear good.
+The red solution is clearly a little lacking, but still captures something of the correct behaviour.
+(The final $L_{\mathrm{data}}$ for the purple, blue and red curves are $0.011$, $0.036$ and $5.1$ respectively.)
 In each case the behaviour is qualitatively correct.
+The results of this section can be produced by the notebook at \texttt{/demo\_notebooks/quartic\_double\_well.ipynb}.
 
 However, I believe this should be regarded as only a partial success for the collapser.
-Manual intervention was required to obtain these solution.
+Manual intervention was required to obtain these solutions.
+Remember that the motivation for this method is to allow unsupervised evaluation of the goodness-of-fit of an ODE to a dataset, as a component of PySR's search.
 Nor is the change I made here completely superior: I tried re-running the experiment of figure \ref{fig:fit_qd_osc} with these changes.
 Initializing the discretization by interpolation still resulted in an excellent fit, but changing $W_{\mathrm{ODE}}$ to $10^{-4}$ for the warmup period caused the optimization to fail, producing NaNs.
 
@@ -537,6 +540,8 @@ The solutions found by the collapser are shown as dashed curves.
 %%FIXME - time to do an optimization
 %%FIXME - can this be extended to other ODEs?
 %%FIXME - can this be extended to irregular grids?
+%%FIXME - scale of the dataset (everything here has O(1) x(t))
+%%FIXME - potential to optimize 
 
 \subsection{Numerical stability}
 \label{sec:numerical_stability}
