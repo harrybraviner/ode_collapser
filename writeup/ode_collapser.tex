@@ -287,6 +287,7 @@ Due to going via the blue cross, we should arrive at the solid yellow circle (th
 Since we are collapsing the vector onto the lower-dimensional solution space, I will refer to this method as \emph{the collapser}.
 
 \subsection{Reducing the stiffness of the optimization problem}
+\label{sec:stiffness}
 
 After implementing this method I initially tried it on an extremely simple system
 $$
@@ -485,6 +486,7 @@ We see that the collapser does indeed correctly enforce the ODE, and does not fi
 \end{figure}
 
 \subsection{Unstable fixed points}
+\label{sec:unstable_fixed_points}
 
 In figure \ref{fig:double_well} we showed 3 (numerically integrated) solutions for the ODE
 $$
@@ -588,12 +590,16 @@ The slow speed is partly due to using a large number of iterations to ensure con
 This could be avoided by dynamically testing if convergence has occurred, for example by testing for relative changes in $L_{\mathrm{ODE}}$, and terminating once improvements cease.
 It is possible that I am also not using the best possible optimizer parameters - this is because I don't really understand the details of the LBFGS optimizer, and so I kept the default options.
 
-%%FIXME - can this be extended to irregular grids?
-%%FIXME - scale of the dataset (everything here has O(1) x(t))
-%%FIXME - potential to optimize 
-
 \subsection{Numerical stability}
 \label{sec:numerical_stability}
+
+The optimizer prarameters I have used here work well for some relatively benign functions (harmonic oscillators, constant acceleration), but had to be manually tuned to solve the case of a trajectory passing very close to an unstable fixed point (see section \ref{sec:unstable_fixed_points}).
+It is also unclear how well this would perform with datasets taking a much larger range of values (e.g. $\tilde{x}(t) \sim 10^6$) or on much larger domains (e.g. $t_{\mathrm{end}} - t_{\mathrm{start}} \sim 10^6$).
+
+As the number of grid points, $N$, increases (either due to the grid becoming finer or the domain becoming larger for the same resolution) the the condition number of the loss due to the second derivative increases (see figure \ref{fig:condition_numbers} in section \ref{sec:stiffness}).
+It is unclear if there is a better way of addressing this than the transformation described in section \ref{sec:stiffness}.
+
+I could probably fix up pathological cases in the optimization as I encounter them, using e.g. gradient-clipping, but it would be better to have a good theoretical understanding of what makes the optimization stable or unstable.
 
 \section{Extensions}
 
