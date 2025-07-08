@@ -136,7 +136,7 @@ But the whole cluster as a single timeseries does not fit this candidate ODE for
 \includegraphics{images/alternative_methods/gp_fitting.png}
 \centering
 \caption{A Gaussian process is fitted through sampled datapoints (top plot), and the second derivative of this process is compared to the right-hand side of the candidate equation $\ddot{x}(t) = -(2\pi10)^2 x(t)$ (bottom plot) where excellent agreement is seen (the relative error is a few parts-per-thousand).
-However, the two clusters of datapoints come from solutions of this ODE that have different initial conditions, being $180^{\circ}$ out of phase (dotted lines on the top plot).
+However, the two clusters of datapoints come from solutions of this ODE that have different initial conditions, being $90^{\circ}$ out of phase (dotted lines on the top plot).
 }
 \label{fig:gp_fitting}
 \end{figure}
@@ -380,6 +380,105 @@ In these coordinates, with a grid size of $N=100$, the optimization process appe
 I have not tested larger grid sizes yet.
 One question that I do not have an answer to is whether there is a better coordinate transformation that could be applied.
 My implementation uses the transformation \eqref{eq:zdef} by default, but does allow for any other linear transformation to be specified.
+
+\section{Qualitative results}
+
+Does this method (plus the coordinate transformation) actually produce discretizations that both satisfy the ODE and fit the data?
+
+To test this, we generate some data from an underlying ODE%
+\footnote{
+Either using the analytic solution, or the ODE solver from SciPy.
+}
+and sample a few points from this curve, and add noise.
+We pass these noisy points, and the ODE (but \emph{not} the intial conditions) to our method.
+We show in figures \ref{fig:fit_const_acc}, \ref{fig:fit_sho}, \ref{fig:fit_damped_sho} and \ref{fig:fit_qd_osc} that it does indeed produce good fits to the underlying curves.
+The results in figure \ref{fig:fit_qd_osc} are particularly gratifying, since this ODE does not have an analytic solution.
+
+\begin{figure}
+\includegraphics{images/results/fit_const_acc.png}
+\centering
+\caption{
+Solution to the ODE $\ddot{x}(t) = -10$ with $x{0} = 0.2$ and $\dot{x}(0) = 0.5$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
+The output of the collapser method is shown as the dashed green curve.
+The collapser has no access to the initial condition that were used to generate the blue curve.
+}
+\label{fig:fit_const_acc}
+\end{figure}
+
+\begin{figure}
+\includegraphics{images/results/fit_sho.png}
+\centering
+\caption{
+Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t)$ with initial amplitude 1.2 and phase $pi/4$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
+The output of the collapser method is shown as the dashed green curve.
+The collapser has no access to the initial condition that were used to generate the blue curve.
+}
+\label{fig:fit_sho}
+\end{figure}
+
+\begin{figure}
+\includegraphics{images/results/fit_damped_sho.png}
+\centering
+\caption{
+Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t) - 4 \dot{x}(t)$ with initial amplitude 1.2 and phase $pi/4$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
+The output of the collapser method is shown as the dashed green curve.
+The collapser has no access to the initial condition that were used to generate the blue curve.
+}
+\label{fig:fit_damped_sho}
+\end{figure}
+
+\begin{figure}
+\includegraphics{images/results/fit_qd_osc.png}
+\centering
+\caption{
+Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t) - 4 \dot{x}(t) \left| \dot{x}(t) \right|$ with $x{0} = 0.8$ and $\dot{x}(0) = 15$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
+The output of the collapser method is shown as the dashed green curve.
+The collapser has no access to the initial condition that were used to generate the blue curve.
+}
+\label{fig:fit_qd_osc}
+\end{figure}
+
+While these results are gratifying, remember that they are a necessary condition, but not a sufficient one, for this method to be useful to our purposes.
+We want to evaluate the goodness-of-fit of the ODE to the data.
+If we pass the \emph{wrong} ODE to the collapser (i.e. one that differs from the ODE used to generate the data), we want to collapser to prefer satisfying the ODE over matching the data.
+In figure \ref{fig:badfit_qd_osc_sho} we demonstrate this.
+We generate data from the same equation (a harmonic oscillator plus quadratic drag) as in figure \ref{fig:fit_qd_osc}, but give a different ODE to the collapser.
+The collapser clearly outputs a solution to the simple harmonic oscillator equation, fitted to the data as best it can.
+The difference shows up quantatively too: in figure \ref{fig:fit_qd_osc} $L_{\mathrm{data}} = 5.9 \times 10^{-3}$, and in figure \ref{fig:badfit_qd_osc_sho} $L_{\mathrm{data}} = 5.3 \times 10^{-2}$.
+This is promising, as it suggests that this method can reject ODEs that are a poor fit to the data.
+
+\begin{figure}
+\includegraphics{images/results/badfit_qd_osc_sho.png}
+\centering
+\caption{
+The data generation here is the same as in figure \ref{fig:fit_qd_osc}.
+However, the collapser has been passed the ODE $\ddot{x}(t) = - (6\pi)^2 x(t)$.
+This differs from the ODE used to generate the data, as the quadratic drag term is absent.
+The output of the collapser method is shown as the dashed green curve, and clearly appears to be a simple harmonic, at the expense of fitting the data.
+}
+\label{fig:badfit_qd_osc_sho}
+\end{figure}
+
+All of the above results were generated using the notebook \texttt{demo\_notebooks/demo\_use\_of\_libraries.ipynb}.
+
+\subsection{Large gaps in timeseries}
+
+Recall that in section \ref{sec:smoothing} we construced an example (see figure \ref{fig:gp_fitting}) in which it was possible to fit the data well while satisfying the ODE locally, but not globally.
+Will our collapser method handle this correctly, or will it build up small violations of the ODE in the region that is far from any sampled datapoint?
+In figure \ref{fig:mismatched_oscillators} we run this experiment (see notebook \texttt{demo\_notebooks/mismatched\_oscillators.ipynb} to reproduce this) and find that the collapser behaves as desired: it enforces the ODE, at the cost of fitting the data.
+In particular, it does not allow any form of `phase drift' in the gap between observations.
+
+\begin{figure}
+\includegraphics{images/results/mismatched_oscillators.png}
+\centering
+\caption{
+We generate two sets of timeseries from oscilators of the same frequency, but $90^{\circ}$ out of phase.
+We treat these as a single series, with the observations from one sampled at early times and the other at late times.
+For this combined series, the ODE $\ddot{x}(t) = - \omega^2 x(t)$ should not fit the data.
+We see that the collapser does indeed correctly enforce the ODE, and does not fit the data well.
+}
+\label{fig:mismatched_oscillators}
+\end{figure}
 
 
 %%FIXME
