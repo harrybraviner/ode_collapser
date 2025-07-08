@@ -6,9 +6,7 @@ _Warning: This repo is a work-in-progress. It is not currently in the most prese
 ![](./writeup/images/results/fit_qd_osc.png)
 
 Given a 2nd-order ODE in the form
-$$
-\ddot{x} = f(\dot{x}, x, t)
-$$
+$$\ddot{x} = f(\dot{x}, x, t)$$
 and a dataset of $(t, x)$ points (orange points), ODE Collapser finds the solution to the ODE minimizing the MSE of the dataset (green dashed curve).
 
 It does this:
