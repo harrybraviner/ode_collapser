@@ -39,6 +39,7 @@ And for a one-dimensional second-order ODE this subspace should generally be 2-d
 I shall be more precise about what this means in section \ref{sec:method}, after briefly reviewing other work and ideas.
 
 \subsection{Previous work}
+\label{sec:prev_work}
 
 I haven't done a very comprehensive literature review, so I can't rule out that someone has done something similar to myself.
 However, a little googling hasn't turned up anything identical.
@@ -575,9 +576,6 @@ On the basis of figure \ref{fig:quantitative_experiments}, I believe the collaps
 
 The results in this section were produce using the notebook \texttt{./demo\_notebooks/quant\_experiments.ipynb}.
 
-
-%FIXME - results of fitting wrong ODE to system. Plots showing MSE of various ODE for each system.
-
 \section{Limitations}
 
 \subsection{Speed}
@@ -586,15 +584,44 @@ The optimization process is relatively slow, taking between 10 and 30 seconds on
 Generating the results of section \ref{sec:quant_results} required 84 runs of the collapser (14 timeseries multiplied by 6 candidate ODEs) and took 15 minutes 34 seconds, for an average of 11 seconds per optimization.
 I doubt using a GPU would give a significant speed-up, given that the configuration space is not very large, and hence the problem is not very parallel.
 
+The slow speed is partly due to using a large number of iterations to ensure convergence to the solution space.
+This could be avoided by dynamically testing if convergence has occurred, for example by testing for relative changes in $L_{\mathrm{ODE}}$, and terminating once improvements cease.
+It is possible that I am also not using the best possible optimizer parameters - this is because I don't really understand the details of the LBFGS optimizer, and so I kept the default options.
 
-%%FIXME - time to do an optimization
-%%FIXME - can this be extended to other ODEs?
 %%FIXME - can this be extended to irregular grids?
 %%FIXME - scale of the dataset (everything here has O(1) x(t))
 %%FIXME - potential to optimize 
 
 \subsection{Numerical stability}
 \label{sec:numerical_stability}
+
+\section{Extensions}
+
+I believe this method could be extended to irregular grids with relative ease.
+Whether it could also be extended to dynamic grids (c.f. ODE solvers that reduce the step-size in regions of high second-derivative) I am less sure about, but would be a likely be a useful capability for some systems.
+
+Many of the papers I found in section \ref{sec:prev_work} consider first order ODEs, potentially in multiple dimensions.
+This would be a useful extension, and would in fact cover the case of solving second-order ODEs (by treating $\dot{x}$ as a coordinate).
+I do not think that would be equivalent to this method, since we would now be optimizing the $2N$ dimensional vector
+$$
+\left( \hat{x}(t_0), \hat{\dot{x}}(t_0), \hat{x}(t_1), \hat{\dot{x}}(t_1), \dots, \hat{x}(t_{N-1}), \hat{\dot{x}}(t_{N-1}) \right)
+$$
+whereas the method discussed here involves optimizing an $N$ dimensional vector.
+It would also require extending this method to allow partial observations, e.g. we observe $x(t)$, but not $\dot{x}(t)$.
+
+Another possibility is that we give the collapser an ODE with unknown parameters.
+For example, we specify
+$$
+f(\dot{x}(t), x(t), t) = -\omega^2 x(t) - \nu \dot{x}(t)
+$$
+\emph{without} values for $\omega$ and $\nu$.
+In this example the solution space would have two additional dimensions.
+We would then minimize the loss with respect to the vector
+$$
+\left(\omega, \nu, \hat{x}_0, \hat{x}_1, \dots, \hat{x}_{N-1} \right)
+$$
+I have not implemented this, so I don't know whether or not it will work.
+One issue might be finding suitable initial values for $\omega$ and $\nu$.
 
 \bibliographystyle{plain}
 \bibliography{ode_collapser}
