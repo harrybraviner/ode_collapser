@@ -17,23 +17,23 @@ We have a collection of datapoints, $\left\{ \tilde{x}(t_i) \right\}$, and an OD
 
 Let's simplify the problem space by making two big restrictions:
 \begin{enumerate}
-\item We only consider second-order ODEs. i.e. the differential operator $\mathcal{D}\left[x ; t \right]$ has the form $\ddot{x}(t) - f\left(x(t), \dot{x}(t), t\right)$.
-\item The datapoints are samples from an evenly-spaced discrete grid of times, $t_0, t_1, \dots, t_{N-1}$, where $t_i - t_{i-1} = h$. The samples themselves need not be evenly spaced: e.g. out dataset could consist of $\left\{\tilde{x}(t_0), \tilde{x}(t_1), \tilde{x}(t_2), \tilde{x}(t_50)\right\}$. We also assume that we have at most one samples from any $t_i$. i.e. we never have multiple samples from the same time with different noise components.
+\item We only consider only one-dimensional second-order ODEs. i.e. the differential operator $\mathcal{D}\left[x ; t \right]$ has the form $\ddot{x}(t) - f\left(x(t), \dot{x}(t), t\right)$.
+\item The datapoints, $\tilde{x}(t)$, are samples from an evenly-spaced discrete grid of times, $t_0, t_1, \dots, t_{N-1}$, where $t_i - t_{i-1} = h$. The samples themselves need not be evenly spaced: e.g. our dataset could consist of $\left\{\tilde{x}(t_0), \tilde{x}(t_1), \tilde{x}(t_2), \tilde{x}(t_{50})\right\}$. We also assume that we have at most one sample from any $t_i$. i.e. we never have multiple samples from the same time with different noise components.
 \end{enumerate}
 
 I am not concerned at this point about where $f$ comes from.
 The motivation for everything in this document is that I would like to be able to modify PySR to search for such an $f$.
 Doing so requires%
-\footnote{It also requires modifying PySR to output functions of $t$, $x(t)$, and $\dot{x}(t)$, but I believe that is comparatively straightforward: have PySR treat $t$, $x(t)$ and $\dot{x}(t)$ as three dependent variables.}
+\footnote{It also requires modifying PySR to output functions of $t$, $x(t)$, and $\dot{x}(t)$, but I believe that is comparatively straightforward: have PySR treat $t$, $x(t)$ and $\dot{x}(t)$ as three independent variables.}
 evaluating the goodness-of-fit of each $f$ to the data, and this work is intended to provide a method of doing so.
 
-The essential idea I shall outline is this: We will approximate the (infinite dimensional) space of function on $\left[t_{\mathrm{start}}, t_{\mathrm{end}} \right]$ by an $N$-dimensional discretization
+The essential idea I shall outline is this: We will approximate the (infinite dimensional) space of functions on $\left[t_{\mathrm{start}}, t_{\mathrm{end}} \right]$ by an $N$-dimensional discretization
 $$
 \left( \hat{x}(t_0), \hat{x}(t_1), \dots, \hat{x}(t_{N-1} \right)
 $$
 Within this $N$-dimensional space there is some subspace (the \emph{solution space}) that satisfies the ODE.%
 \footnote{
-And for a one-dimensional second-order ODE this subspace should generally by 2-dimensional.
+And for a one-dimensional second-order ODE this subspace should generally be 2-dimensional.
 }
 \textbf{We shall collapse the $N$-dimensional discretization onto the solution space \emph{along the path minimizing the MSE of the data}.}
 I shall be more precise about what this means in section \ref{sec:method}, after briefly reviewing other work and ideas.
@@ -85,7 +85,7 @@ First, the additional time taken to search for initial conditions (and all of th
 Secondly, outputting an ODE and an intial condition allows us to test only a single dataset.
 We might have multiple timeseries that we believe obey the same ODE with different initial conditions.
 
-In issue \cite{pysrissue732} Miles refers someone looking to so SR on ODEs to \cite{pysrchangenotev1.3.0}, which suggests performing integration of a function by generating data points for the integrand, and then performing SR on candidate expressions for the integral.
+In issue \cite{pysrissue732} Miles refers someone looking to do SR on ODEs to \cite{pysrchangenotev1.3.0}, which suggests performing integration of a function by generating data points for the integrand, and then performing SR on candidate expressions for the integral.
 Could this method be applied to an ODE (by replacing the dataset generated from the integrand in \cite{pysrchangenotev1.3.0} by the timeseries)?
 One limitation of doing so is that we are now searching over the expression for the \emph{solution to} the ODE.
 Many physical systems have a simple expression in terms of ODEs, but no closed form solution to that ODE.
@@ -116,6 +116,7 @@ The method I outline in the note should be able to handle much sparser and noisi
 \end{figure}
 
 \subsection{Smoothing the data with a kernel}
+\label{sec:smoothing}
 
 Smoothing the datapoints with some kernel function (e.g. a rolling average window) would go some way toward addressing the issue of noise in the dataset.
 PySR supports something similar to this feature via the \texttt{denoise} option, which first fits a Gaussian process to the data.
@@ -152,6 +153,7 @@ We would mark \emph{any} candidate ODE as a poor fit to data with large gaps in 
 The Gaussian process only helps us \emph{interpolate}; it is not reasonable to expect it to also \emph{extrapolate}.
 
 \subsection{Sweep-and-shoot methods}
+\label{sec:sweep_and_shoot}
 
 If we knew the intial conditions for our dataset, we could integrate from the earliest point using a numerical ODE solver and compare the numerically integrated solution, $\hat{x}(t)$, to the sampled solution $\tilde{x}(t)$, at every later sampling time.
 This works well if the initial conditions are known with zero noise.
@@ -205,6 +207,81 @@ We would also have a version of the problem indicated in figure \ref{fig:double_
 
 \section{The Collapse Method}
 \label{sec:method}
+
+There are two different ways to think of the problem of how well an ODE fits a sampled dataset. Every paper I have been able to find on this subject implicitly does one or the other, but none of them seem to discuss the fact that the other viewpoint exists, or even explicitly acknowledge their choice.
+\begin{enumerate}
+\item Fit the data exactly and measure the extent to which the ODE is violated. e.g. $L_{\mathrm{ODE}} = \sum_i \left( \tilde{\ddot{x}}(t_i) - f(\tilde{x}(t_i), \tilde{\dot{x}}(t_i), t_i)\right)^2$.
+This is the approch of most papers that approximate the derivative by finite differences between datapoints (though, as we discussed in section \ref{sec:smoothing}, you could fit a smoothing function instead).
+\item Insist on the ODE being obeyed, and measure the error of the data relative to the solution, e.g. $L_{\mathrm{data}} = \sum_i \left( \hat{x}(t_i) - \tilde{x}(t_i) \right)^2$.
+This is the approach of papers where the candidate ODE is numerically integrated. It requires some way of obtaining initial conditions. 
+\end{enumerate}
+
+\begin{figure}
+\includegraphics{images/method/disc_space_viz.png}
+\centering
+\caption{
+Schematic representation of discretized solution space.
+Gray dashed curves are contours lines of the data loss, $L_{\mathrm{data}}$.
+The solid blue dot shows the (global and only) minimum of $L_{\mathrm{data}}$.
+The heavy green curve is the solution space, and the orange circles denote the minima of $L_{\mathrm{data}}$ restricted to the solution space (the hollow circle is a local minimum, the solid circle a global minimum).
+}
+\label{fig:disc_space_viz}
+\end{figure}
+
+The second approach (satisfying the ODE and evaluating the error in fitting the data) feels better-defined.
+It is unclear that the extent-of-violation of an ODE is well-captured by the squared-error of the difference between the two sides of the equation.
+
+However, there are pitfalls with this.
+It may be difficult to find initial conditions, as discussed in section \ref{sec:sweep_and_shoot}.
+Even if we were able to backpropogate through the ODE solver to compute the gradient of $L_{\mathrm{data}}$ with respect to our initial conditions, the loss function restricted to the solution-space may not be convex.
+This is illustrated in figure \ref{fig:disc_space_viz}: if we start near the local minimum of the solution space, we will never find the global minimum by any method of small steps.
+
+What I have therefore implemented is approach (1) followed by approach (2).
+
+We begin by discretizing the space of functions on $[t_0, t_{N-1}]$ as a vector
+$$
+\left( \hat{x}(t_0), \hat{x}(t_1), \dots, \hat{x}(t_{N-1}) \right)
+$$
+which for notational convenience I will call
+$$
+\left( \hat{x}_0, \hat{x}_1, \dots, \hat{x}_{N-1} \right)
+$$
+from here on.
+We require that these grid-points be evenly spaced, and denote the step-size as $h = t_i - t_{i-1}$.
+
+Remember that we have measurements from only some of these times.
+Let $\mathcal{I}$ denote the set of indices such that we have a measurement $\tilde{x}(t_i)$ at time $i$.
+Again, for notational convenience I will call these measurements $\tilde{x}_i$ from here on.
+These measurements may contain noise.
+
+We now define two loss functions:%
+\footnote{
+We could instead use the backward derivative, $\hat{\dot{x}}(t_i) = h^{-1} \left( \hat{x}(t_{i}) -  \hat{x}(t_{i-1})\right)$. I do not think this should make a difference, but I have added an option to do so in my code.
+}
+\begin{align}
+\label{eq:Ldata}
+L_{\mathrm{data}} &= \frac{1}{2} \frac{1}{\left| \mathcal{I} \right|} \sum_{i \in \mathcal{I}} \left( \hat{x}_i - \tilde{x}_i \right)^2 \\
+\label{eq:Lode}
+L_{\mathrm{ODE}} &= \frac{1}{2} h \sum_{i=1}^{N-2} \left( \hat{\ddot{x}}_i - f\left( \hat{x}_i, \hat{\dot{x}}_i, t_i \right) \right)^2 \\
+\mathrm{where} \, & \, \hat{\ddot{x}}_i = h^{-2} \left( \hat{x}_{i-1} - 2\hat{x}_i + \hat{x}_{i+1} \right) \\
+\mathrm{and} \, & \, \hat{\dot{x}}_i = h^{-1} \left( \hat{x}_{i+1} - \hat{x}_i \right)
+\end{align}
+
+Note the range of the sum in \eqref{eq:Lode}: we could not extend this to $i=0$ or $N-1$, since we would not have the points $\hat{x}_{-1}$ and $\hat{x}_N$ needed to define the second derivative.
+But this should not concern us.
+Imagine that our task was to set $L_{\mathrm{ODE}}$ to zero.
+Each term must vanish individually, so the sum gives us $N-2$ equations in $N$ unknowns ($\hat{x}_0, \dots, \hat{x}_{N-1}$).
+For most choices of $f$ we will not be able to solve these equations, but for $N-2$ equations in $N$ unknowns we expect that, if a solution space exists, it will be 2 dimensional.
+And that is exactly what we expect for a second-order ODE.
+
+We begin by minimizing $L_{\mathrm{data}}$ (an easy task, since this is a convex loss function with constant curvature), and then minimize $L_\mathrm{ODE}$.
+In practice we do this by gradient descent, minimizing
+$$
+L_{\mathrm{total}} = (1 - W_{\mathrm{ODE}}) L_{\mathrm{data}} + W_{\mathrm{ODE}} L_{\mathrm{ODE}}
+$$
+and varying $W_{\mathrm{ODE}}$ from close to zero at the start training to close to one at the end of training.
+Schematically, we first proceed to the blue cross (exactly fitting the data) in figure \ref{fig:disc_space_viz}, and then to the green curve (the solution space).
+Due to going via the blue cross, we should arrive at the solid yellow circle (the global minimum of $L_{\mathrm{data}}$ on the solution space).
 
 %%FIXME
 %and the derivatives by
