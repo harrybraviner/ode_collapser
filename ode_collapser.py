@@ -15,6 +15,7 @@ def collapse_to_solution(
         logging_freq_grids=10,
         first_deriv_fwd_mode=True,
         show_progress=False,
+        get_optimizer_from_params=None,
 ):
     # Get the number of grid points
     t_grid = torch.arange(t_start, t_end, h)
@@ -40,6 +41,9 @@ def collapse_to_solution(
             # z_i = x(t_i) - x(t_{i-1}) for i > 0
             transformation_x2z[i, i] = 1.0
             transformation_x2z[i, i - 1] = -1.0
+    else:
+        if not isinstance(transformation_x2z, torch.Tensor):
+            transformation_x2z = torch.tensor(transformation_x2z)
 
     # Default loss-weighting schedule
     if get_w_ODE is None:
@@ -69,7 +73,10 @@ def collapse_to_solution(
     # Initialize the optimizer.
     # This problem seems to benefit from using a second-order optimizer (which LBFGS is), and I believe that
     # is due to the Hessian of loss_ODE (see below for definition) having a very large condition number.
-    optimizer = torch.optim.LBFGS(lr=1, history_size=10, params=[z_solution_grid])
+    if get_optimizer_from_params is None:
+        optimizer = torch.optim.LBFGS(lr=1, history_size=10, params=[z_solution_grid])
+    else:
+        optimizer = get_optimizer_from_params([z_solution_grid])
 
     # Loss function definitions
 
