@@ -8,6 +8,7 @@ def _interpolate_between_samples(
 ):
     """
     Returns a linear interpolation between the points x_samples at the grid points t_grid[idx_samples].
+
     :param t_grid: Grid of times.
     :param idx_samples: Indices of times that x values are samples from.
     :param x_samples: Samples at times. Shape must match idx_samples.
@@ -37,6 +38,35 @@ def collapse_to_solution(
         show_progress=False,
         get_optimizer_from_params=None,
 ):
+    """
+    Runs the ODE Collapser algorithm and returns results.
+
+    :param rhs: Function f(x, xdot, t). Should be able to accept torch.Tensors after JIT-compilation.
+    :param h: t-grid step size.
+    :param t_start: First t in our discretization grid.
+    :param t_end: Last t in our discretization grid.
+    :param idx_samples: Indices of t-grid that x-samples are taken from. It is very important that the
+    t-grid these indices refer to matches arange(t_start, t_end, h)
+    :param x_samples: Sampled values x(t_i), where t_i are the values of t-grid specified by idx_samples.
+    :param transformation_x2z: Optional linear transformation to apply to the x(t). The optimization will be
+    performed in z-space. This transformation must be invertible. Defaults to transforming to gradient-space.
+    :param N_iter: Number of iterations of optimization to perform.
+    :param get_w_ODE: Function returning the weight to apply to the L_ODE loss. Default is a warm-up period
+    followed by a linear ramp-up.
+    :param initialize_by_interpolation: If True, will initialize the x(t) to linearly interpolate between the
+    sampled datapoints. If False, will initialize to zero in z-space.
+    :param logging_freq_scalars: Frequency with which to log scalar quantities.
+    :param logging_freq_grids: Frequency with which to log grid quantities. These are larger and will consume
+    more memory if logged frequently. This might also slow down the optimization.
+    :param first_deriv_fwd_mode: If True, will use xdot_i = (x_{i+1} - x_i)/h.
+    If False, will use xdot_i = (x_i - x_{i-1})/h.
+    :param show_progress: If True, will use tqdm to display a progress bar for the optimizer iterations.
+    :param get_optimizer_from_params: Function that takes a list of parameters as input and returns the
+    optimizer that we will step. Will be passed the z-space discretization as the parameters list.
+    If not supplied, will default to constructing a LBFGS optimizer.
+    :return: A Dict containing 'x_solution_grid', 'log_scalar' and 'log_grids' as keys.
+    'x_solution_grid' corresponds to the end result of the optimization (after transformation back from z-space).
+    """
     # Get the number of grid points
     t_grid = torch.arange(t_start, t_end, h)
     n_grid = t_grid.shape[0]
