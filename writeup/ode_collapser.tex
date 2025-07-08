@@ -3,6 +3,8 @@
 \usepackage{amsmath}
 \usepackage{url}
 \usepackage{graphicx}
+\usepackage{hhline}
+\usepackage{multirow}
 \title{Fitting ODE solutions to noisy data by collapsing onto the manifold of solutions}
 \author{Harry Braviner}
 
@@ -555,8 +557,9 @@ Symbols are coloured green if the candidate ODE matches the ODE used to generate
 \end{figure}
 
 To get a more comprehensive picture of how well the collapser can distinguish between candidate ODEs, I ran a series of experiments.
-I selected 6 systems (ODEs) and for each ODE I selected 2 or 3 sets of initial conditions.
-I constructed the solution of each ODE and initial condition pair (either by knowledge of the analytical solution or using PySR's numerical integrator), and sampled a timeseries of 10 points from each, adding Gaussian noise with $\sigma = 0.1$.%
+I selected 6 systems (ODEs) and for each system I selected 2 or 3 sets of initial conditions.
+See table \ref{tab:systems_for_experiments} for a description of each system.
+I constructed the solution of each system and initial condition pair (either by knowledge of the analytical solution or using PySR's numerical integrator), and sampled a timeseries of 10 points from each, adding Gaussian noise with $\sigma = 0.1$.%
 \footnote{
 The times from which the samples are taken are chosen independently for each solution.
 }
@@ -566,6 +569,36 @@ I also know the initial conditions, but we won't use those in any way.
 }
 For each timeseries I pass it, along with each possible candidate ODE, to the collapser.
 What I expect to see is this: the collapser always outputting small $L_{\mathrm{ODE}}$ (indicating that it has found a solution to the candidate ODE), and outputting the small $L_{\mathrm{data}}$ when the candidate ODE matches the ODE that was used to generate the timeseries.
+
+\begin{table}[h!]
+\centering
+\begin{tabular}{| c | c | c | c |}
+\hline
+System & Description & ODE & Initial conditions \\ \hhline{|=|=|=|=|}
+\multirow{2}{4em}{CA1} & \multirow{2}{8em}{Constant (large) acceleration} & \multirow{2}{14em}{$\ddot{x}(t) = -10$} & $x(0) = 0$, $\dot{x}(0) = 2$ \\ \hhline{|~|~|~|-|}
+& & & $x(0) = 2$, $\dot{x}(0) = 0$ \\
+\hline
+\multirow{2}{4em}{CA2} & \multirow{2}{8em}{Constant (small) acceleration} & \multirow{2}{14em}{$\ddot{x}(t) = -5$} & $x(0) = 0$, $\dot{x}(0) = 2$ \\ \hhline{|~|~|~|-|}
+& & & $x(0) = 2$, $\dot{x}(0) = 0$ \\
+\hline
+\multirow{2}{4em}{QD1} & \multirow{2}{8em}{Quadratic-drag oscillator 1} & \multirow{2}{14em}{$\ddot{x}(t) = -(6\pi)^2 x(t) -\dot{x}(t)\left|\dot{x}(t)\right|$} & $x(0) = 0.85$, $\dot{x}(0) = 16$ \\ \hhline{|~|~|~|-|}
+& & & $x(0) = 0.85$, $\dot{x}(0) = -16$ \\
+\hline
+\multirow{2}{4em}{QD2} & \multirow{2}{8em}{Quadratic-drag oscillator 2} & \multirow{2}{14em}{$\ddot{x}(t) = -(4\pi)^2 x(t) - \frac{1}{2}\dot{x}(t)\left|\dot{x}(t)\right|$} & $x(0) = 0.85$, $\dot{x}(0) = 16$ \\ \hhline{|~|~|~|-|}
+& & & $x(0) = 0.85$, $\dot{x}(0) = -16$ \\
+\hline
+\multirow{3}{4em}{SHO} & \multirow{3}{8em}{Simple harmonic oscillator} & \multirow{3}{14em}{$\ddot{x}(t) = -(6\pi)^2 x(t)$ } & $A_0 = 1.2$, $\phi_0 = \pi/4$ \\ \hhline{|~|~|~|-|}
+& & & $A_0 = 0.8$, $\phi_0 = 0$\\ \hhline{|~|~|~|-|}
+& & & $A_0 = 1.2$, $\phi_0 = -\pi/4$\\
+\hline
+\multirow{3}{4em}{DHO} & \multirow{3}{8em}{Simple harmonic oscillator} & \multirow{3}{14em}{$\ddot{x}(t) = -(6\pi)^2 x(t) - 4 \dot{x}(t)$ } & $A_0 = 1.2$, $\phi_0 = \pi/4$ \\ \hhline{|~|~|~|-|}
+& & & $A_0 = 0.8$, $\phi_0 = 0$\\ \hhline{|~|~|~|-|}
+& & & $A_0 = 1.2$, $\phi_0 = -\pi/4$\\
+\hline
+\end{tabular}
+\caption{The systems used in the experiments of section \ref{sec:quant_results}.}
+\label{tab:systems_for_experiments}
+\end{table}
 
 The results of this experiment are plotted in figure \ref{fig:quantitative_experiments}.
 Green symbols denote runs of the collapser where the candidate ODE matched the ODE used to generate the timeseries, and we want these to have a lower $L_{\mathrm{data}}$ than the red points (denoting the `wrong' ODE being passed to the collapser.
