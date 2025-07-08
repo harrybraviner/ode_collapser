@@ -16,7 +16,7 @@ It does this:
 2. without privileging any point of the dataset by using it as an initial or boundary condition
 3. and without sweeping over any grid of initial condtions.
 
-To experiment with the collapser, start with <./demo_notebooks/demo_use_of_libraries.ipynb>.
+To experiment with the collapser, start with [this notebook](demo_notebooks/demo_use_of_libraries.ipynb).
 
-For detailed explanation of how this works, and current limitations, see <./writeup/ode_collapser.pdf>.
+For detailed explanation of how this works, and current limitations, [read this](writeup/ode_collapser.pdf).
 
