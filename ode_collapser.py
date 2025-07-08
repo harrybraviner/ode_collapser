@@ -1,6 +1,25 @@
 import torch
 from tqdm import tqdm
 
+def _interpolate_between_samples(
+        t_grid: torch.Tensor,
+        idx_samples: torch.Tensor,
+        x_samples: torch.Tensor,
+):
+    """
+    Returns a linear interpolation between the points x_samples at the grid points t_grid[idx_samples].
+    :param t_grid: Grid of times.
+    :param idx_samples: Indices of times that x values are samples from.
+    :param x_samples: Samples at times. Shape must match idx_samples.
+    :return: Interpolated x values, should match the shape of t_grid.
+    """
+    x_interpolated = torch.full_like(t_grid, fill_value=x_samples[0].item(), dtype=torch.float64)
+    for j, (i1, i2) in enumerate(zip(idx_samples[:-1], idx_samples[1:])):
+        x_interpolated[i1 + 1: i2 + 1] = x_samples[j] + (x_samples[j + 1] - x_samples[j]) * (
+                    t_grid[i1 + 1:i2 + 1] - t_grid[i1]) / (t_grid[i2] - t_grid[i1])
+    x_interpolated[idx_samples[-1] + 1:] = x_samples[-1]
+    return x_interpolated
+
 def collapse_to_solution(
         rhs,
         h,
@@ -11,6 +30,7 @@ def collapse_to_solution(
         transformation_x2z=None,
         N_iter=5000,
         get_w_ODE=None,
+        initialize_by_interpolation=True,
         logging_freq_scalars=1,
         logging_freq_grids=10,
         first_deriv_fwd_mode=True,
@@ -50,13 +70,13 @@ def collapse_to_solution(
         def get_w_ODE(it, n_iterations):
             if it < 0.1 * n_iterations:
                 # First 10% of steps: optimize mainly for fitting the samples
-                w_ode = 0.01
+                w_ode = 1e-2
             elif it >= 0.9 * n_iterations:
                 # Final 90% of steps: optimize mainly for satisfying the ODE
                 w_ode = 1.0
             else:
                 # Linear ramp-up of w_ODE in between these iterations
-                w_ode = 0.01 + 0.99 * (it - 0.1 * n_iterations) / (0.8 * n_iterations)
+                w_ode = 1e-2 + (1 - 1e-2) * (it - 0.1 * n_iterations) / (0.8 * n_iterations)
             return w_ode
 
     # Invert the transformation matrix. We will need this repeatedly later.
@@ -68,7 +88,11 @@ def collapse_to_solution(
     # Initialize the solution grid.
     # I don't believe there is any benefit to using random initialization, since this problem does not
     # have the same requirement for symmetry-breaking that exists with the hidden neurons of a neural network.
-    z_solution_grid = torch.zeros(n_grid, dtype=torch.float64, requires_grad=True)
+    if initialize_by_interpolation:
+        x_interpolated = _interpolate_between_samples(t_grid, idx_samples, x_samples)
+        z_solution_grid = (transformation_x2z @ x_interpolated).detach().clone().to(torch.float64).requires_grad_(True)
+    else:
+        z_solution_grid = torch.zeros(n_grid, dtype=torch.float64, requires_grad=True)
 
     # Initialize the optimizer.
     # This problem seems to benefit from using a second-order optimizer (which LBFGS is), and I believe that

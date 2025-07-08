@@ -176,7 +176,7 @@ This system is a double-well potential with stable fixed points at $x = \pm a$ (
 \includegraphics{images/alternative_methods/double_well.png}
 \centering
 \caption{
-Three (numerically integrated) solutions to $\ddot{x}(t) = -x(t)^2 + a^2 x(t) - \nu \dot{x}(t)$ for $a = 6\pi / \sqrt{2}$ and $\nu = 3$.
+Three (numerically integrated) solutions to $\ddot{x}(t) = -x(t)^3 + a^2 x(t) - \nu \dot{x}(t)$ for $a = 6\pi / \sqrt{2}$ and $\nu = 3$.
 Note that the initial conditions have identical velocities and differ very small values of the $x$ coordinate.
 }
 \label{fig:double_well}
@@ -283,6 +283,8 @@ and varying $W_{\mathrm{ODE}}$ from close to zero at the start training to close
 Schematically, we first proceed to the blue cross (exactly fitting the data) in figure \ref{fig:disc_space_viz}, and then to the green curve (the solution space).
 Due to going via the blue cross, we should arrive at the solid yellow circle (the global minimum of $L_{\mathrm{data}}$ on the solution space).
 
+Since we are collapsing the vector onto the lower-dimensional solution space, I will refer to this method as \emph{the collapser}.
+
 \subsection{Reducing the stiffness of the optimization problem}
 
 After implementing this method I initially tried it on an extremely simple system
@@ -382,6 +384,7 @@ One question that I do not have an answer to is whether there is a better coordi
 My implementation uses the transformation \eqref{eq:zdef} by default, but does allow for any other linear transformation to be specified.
 
 \section{Qualitative results}
+\label{sec:qual_results}
 
 Does this method (plus the coordinate transformation) actually produce discretizations that both satisfy the ODE and fit the data?
 
@@ -400,7 +403,7 @@ The results in figure \ref{fig:fit_qd_osc} are particularly gratifying, since th
 \caption{
 Solution to the ODE $\ddot{x}(t) = -10$ with $x{0} = 0.2$ and $\dot{x}(0) = 0.5$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
 The output of the collapser method is shown as the dashed green curve.
-The collapser has no access to the initial condition that were used to generate the blue curve.
+The collapser has no access to the initial conditions that were used to generate the blue curve.
 }
 \label{fig:fit_const_acc}
 \end{figure}
@@ -411,7 +414,7 @@ The collapser has no access to the initial condition that were used to generate 
 \caption{
 Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t)$ with initial amplitude 1.2 and phase $pi/4$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
 The output of the collapser method is shown as the dashed green curve.
-The collapser has no access to the initial condition that were used to generate the blue curve.
+The collapser has no access to the initial conditions that were used to generate the blue curve.
 }
 \label{fig:fit_sho}
 \end{figure}
@@ -422,7 +425,7 @@ The collapser has no access to the initial condition that were used to generate 
 \caption{
 Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t) - 4 \dot{x}(t)$ with initial amplitude 1.2 and phase $pi/4$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
 The output of the collapser method is shown as the dashed green curve.
-The collapser has no access to the initial condition that were used to generate the blue curve.
+The collapser has no access to the initial conditions that were used to generate the blue curve.
 }
 \label{fig:fit_damped_sho}
 \end{figure}
@@ -431,9 +434,9 @@ The collapser has no access to the initial condition that were used to generate 
 \includegraphics{images/results/fit_qd_osc.png}
 \centering
 \caption{
-Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t) - 4 \dot{x}(t) \left| \dot{x}(t) \right|$ with $x{0} = 0.8$ and $\dot{x}(0) = 15$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
+Solution to the ODE $\ddot{x}(t) = - (6\pi)^2 x(t) - 4 \dot{x}(t) \left| \dot{x}(t) \right|$ with $x(0) = 0.8$ and $\dot{x}(0) = 15$ (blue curve), and a small number of samples (orange dots) plus Gaussian noise with $\sigma = 0.1$.
 The output of the collapser method is shown as the dashed green curve.
-The collapser has no access to the initial condition that were used to generate the blue curve.
+The collapser has no access to the initial conditions that were used to generate the blue curve.
 }
 \label{fig:fit_qd_osc}
 \end{figure}
@@ -480,19 +483,63 @@ We see that the collapser does indeed correctly enforce the ODE, and does not fi
 \label{fig:mismatched_oscillators}
 \end{figure}
 
+\subsection{Unstable fixed points}
 
-%%FIXME
-%and the derivatives by
-%$$
-%\hat{\ddot{x}}(t_i) = h^{-2} \left( \hat{x}(t_{i-1}) - 2 \hat{x}(t_i) + \hat{x}(t_{i+1}) \right)
-%$$
-%and%
-%\footnote{
-%We could instead use the backward derivative, $\hat{\dot{x}}(t_i) = h^{-1} \left( \hat{x}(t_{i}) -  \hat{x}(t_{i-1})\right)$. I do not think this should make a difference, but I have added an option to do so in my code.
-%}
-%$$
-%\hat{\dot{x}}(t_i) = h^{-1} \left( \hat{x}(t_{i+1}) -  \hat{x}(t_i)\right)
-%$$
+In figure \ref{fig:double_well} we showed 3 (numerically integrated) solutions for the ODE
+$$
+\ddot{x}(t) = - x(t)^3 + (6\pi/\sqrt{2})^2 x(t) - 3 \dot{x}(t)
+$$
+and claimed that it would be very hard for sweep-and-shoot method to discover appropriate initial conditions, and that such a method would falsely reject this ODE as a inconsistent with the data.
+Can the collapser method find these solutions?
+
+It can, but modifications needed to be made.
+Using settings that produced the results of section \ref{sec:qual_results}, the collapser produced three curves that appeared to obey the ODE, but were very poor fits to that data.
+Many of them `fell' into the opposite well compared to their sampled data.
+Inspecting the evolution of $L_{\mathrm{data}}$ and $L_{\mathrm{ODE}}$ over the course of the optimization showed that $L_{\mathrm{data}}$ did not reach zero, even during the early stages of optimization where $W_{\mathrm{ODE}} = 10^{-2}$.
+We should in fact be able to fit the data exactly if we ignore the requirement to satisfy the ODE.
+So I first modified the code to initialize the discretized solution to a linear interpolation between the data points.
+
+Initializing the discretized solution in this manner produced a good result on one of the three timeseries, but the other two still fit the data extremely poorly by falling into the wrong well.
+Again inspecting the evolution of $L_{\mathrm{data}}$ and $L_{\mathrm{ODE}}$ showed that $L_{\mathrm{data}}$ spiked upwards to an extreme value at the start of the optimization, before decreasing somewhat.
+This occurred even during the early `warmup' period when $W_{\mathrm{ODE}} = 10^{-2}$.
+By decreasing $W_{\mathrm{ODE}}$ to $10^{-4}$ I was able to obtain the fits shown in figure \ref{fig:double_well_collapser}.
+
+The results of figure \ref{fig:double_well_collapser} do show good fits.
+The purple solution has been found almost exactly, and the blue has found a solution that matches the data very closely, even though it does not match the underlying solution.
+The red solution is clearly a little lacking, but still appear good.
+In each case the behaviour is qualitatively correct.
+
+However, I believe this should be regarded as only a partial success for the collapser.
+Manual intervention was required to obtain these solution.
+Nor is the change I made here completely superior: I tried re-running the experiment of figure \ref{fig:fit_qd_osc} with these changes.
+Initializing the discretization by interpolation still resulted in an excellent fit, but changing $W_{\mathrm{ODE}}$ to $10^{-4}$ for the warmup period caused the optimization to fail, producing NaNs.
+
+More development is needed to make the optimizer widely useable, and I discuss this in section \ref{sec:numerical_stability}.
+
+\begin{figure}
+\includegraphics{images/results/double_well_collapser.png}
+\centering
+\caption{
+The solid curves show three (numerically integrated) solutions to $\ddot{x}(t) = -x(t)^3 + a^2 x(t) - \nu \dot{x}(t)$ for $a = 6\pi / \sqrt{2}$ and $\nu = 3$.
+The circles of the same colour show datapoints sampled (with Gaussian noise with $\sigma = 0.1$) from each curve.
+Each of the three timeseries, along with the ODE, are passed to the collapser.
+The solutions found by the collapser are shown as dashed curves.
+}
+\label{fig:double_well_collapser}
+\end{figure}
+
+\section{Quantative Results}
+
+%FIXME - results of fitting wrong ODE to system. Plots showing MSE of various ODE for each system.
+
+\section{Limitations}
+
+%%FIXME - time to do an optimization
+%%FIXME - can this be extended to other ODEs?
+%%FIXME - can this be extended to irregular grids?
+
+\subsection{Numerical stability}
+\label{sec:numerical_stability}
 
 \bibliographystyle{plain}
 \bibliography{ode_collapser}
