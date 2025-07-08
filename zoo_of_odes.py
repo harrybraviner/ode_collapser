@@ -2,9 +2,29 @@ import numpy as np
 import scipy.integrate as integrate
 
 def get_rhs_func(ode_name, params):
+    """
+    Returns a function f(x, xdot, t) suitable for passing to ode_collapser.collapse_to_solution.
+
+    :param ode_name: Name specifying the family of ODEs.
+    :param params: Parameters fully specifying the ODE within the family.
+    :return:
+    """
     return _rhs_funcs_and_solns[ode_name][0](**params)
 
 def get_solution(ode_name, params, initial_conditions, t_start, t_end, h):
+    """
+    Return an array of x(t) values corresponding to the solution of the ODE and initial conditions specified.
+    The x(t) values are for the grid arange(t_start, t_end, h), with no subsampling or noise addition.
+    These will be from the analytic solution if it is available, or from numerical integration otherwise.
+
+    :param ode_name: Name specifying the family of ODEs.
+    :param params: Parameters fully specifying the ODE within the family.
+    :param initial_conditions: Initial conditions determining the solution to the ODE.
+    :param t_start: Start time.
+    :param t_end: End time.
+    :param h: Time-resolution (t_{i+1} - t_i).
+    :return: Array of x(t) values.
+    """
     # Discrete grid we will return x(t_0), x(t_1), ..., x(t_{N-1}) values for.
     t_grid = np.arange(t_start, t_end, h)
     return _rhs_funcs_and_solns[ode_name][1](**params, **initial_conditions, t=t_grid), t_grid
