@@ -502,7 +502,7 @@ So I first modified the code to initialize the discretized solution to a linear 
 Initializing the discretized solution in this manner produced a good result on one of the three timeseries, but the other two still fit the data extremely poorly by falling into the wrong well.
 Again inspecting the evolution of $L_{\mathrm{data}}$ and $L_{\mathrm{ODE}}$ showed that $L_{\mathrm{data}}$ spiked upwards to an extreme value at the start of the optimization, before decreasing somewhat.
 This occurred even during the early `warmup' period when $W_{\mathrm{ODE}} = 10^{-2}$.
-By decreasing $W_{\mathrm{ODE}}$ to $10^{-4}$ I was able to obtain the fits shown in figure \ref{fig:double_well_collapser}.
+I was able to obtain the fits shown in figure \ref{fig:double_well_collapser} by decreasing $W_{\mathrm{ODE}}$ to $10^{-4}$.
 
 The results of figure \ref{fig:double_well_collapser} do show good fits.
 The purple solution has been found almost exactly, and the blue has found a solution that matches the data very closely, even though it does not match the underlying solution.
@@ -532,10 +532,60 @@ The solutions found by the collapser are shown as dashed curves.
 \end{figure}
 
 \section{Quantative Results}
+\label{sec:quant_results}
+
+Recall that the motivation for this method is to take a timeseries, and distinguish between ODEs that are a good and a poor fit to that timeseries.
+We need the collapser to provide a good fit with low $L_{\mathrm{data}}$ when provided with an ODE that fits the data well, but we also need it to produce a high $L_{\mathrm{data}}$ when the ODE is unable to fit the data well.
+We showed an example of this in figures \ref{fig:fit_qd_osc} and \ref{fig:badfit_qd_osc_sho}.
+
+\begin{figure}
+\includegraphics{images/results/quantitative_experiments.png}
+\centering
+\caption{
+Each panel shows the results of running the collapser with a timeseries generated from the ODE in the title.
+For example, the top right panel shows results where the timeseries are generated from the second quadratic drag ODE  (`QD2').
+Within each panel, every point corresponds to running the collapser, with the shape of the point denoting which candidate ODE was passed to it.
+Note that each symbol type appears either 2 or 3 times, depending on how many timeseries (corresponding to different initial conditions) we generated from the ODE in the title of the panel.
+Symbols are coloured green if the candidate ODE matches the ODE used to generate the timeseries, and red if it does not.
+}
+\label{fig:quantitative_experiments}
+\end{figure}
+
+To get a more comprehensive picture of how well the collapser can distinguish between candidate ODEs, I ran a series of experiments.
+I selected 6 systems (ODEs) and for each ODE I selected 2 or 3 sets of inital conditions.
+I constructed the solution of each ODE and initial condition pair (either by knowledge of the analytical solution or using SciPy's numerical integrator), and sampled a timeseries of 10 points from each, adding Gaussian noise with $\sigma = 0.1$.%
+\footnote{
+The times from which the samples are taken are chosen independently for each solution.
+}
+This gives me 14 timeseries, and for each of these I know the ODE that generated it.%
+\footnote{
+I also know the initial conditions, but we won't use those in any way.
+}
+For each timeseries I pass it, along with each possible candidate ODE, to the collapser.
+What I expect to see is this: the collapser always outputting small $L_{\mathrm{ODE}}$ (indicating that it has found a solution to the candidate ODE), and outputting the small $L_{\mathrm{data}}$ when the candidate ODE matches the ODE that was used to generate the timeseries.
+
+The results of this experiment are plotted in figure \ref{fig:quantitative_experiments}.
+Green symbols denote runs of the collapser where the candidate ODE matched the ODE used to generate the timeseries, and we want these to have a lower $L_{\mathrm{data}}$ than the red points (denoting the `wrong' ODE being passed to the collapser.
+This is the case for 13 of the 14 timeseries, the one exception being one of the timeseries generated from QD1, our first quadratic-drag oscillator.
+QD1 has a higher $\nu$ than QD2, and it is possible that the reason a simple-harmonic oscillator can be fitted well to it is due to the motion decaying quickly, allowing the SHO to simply be fit with a small amplitude.
+The other ODEs that the collapser is unable to separate from QD1 in this case is DHO, the damped harmonic oscillator with linear damping.
+This is at least a system with somewhat similar physics.
+
+On the basis of figure \ref{fig:quantitative_experiments}, I believe the collapser is a promising method for assessing the goodness-of-fit of a candidate ODE to noisy data in the absence of initial conditions.
+
+The results in this section were produce using the notebook \texttt{./demo\_notebooks/quant\_experiments.ipynb}.
+
 
 %FIXME - results of fitting wrong ODE to system. Plots showing MSE of various ODE for each system.
 
 \section{Limitations}
+
+\subsection{Speed}
+
+The optimization process is relatively slow, taking between 10 and 30 seconds on my CPU for most of the examples in section \ref{sec:qual_results}.
+Generating the results of section \ref{sec:quant_results} required 84 runs of the collapser (14 timeseries multiplied by 6 candidate ODEs) and took 15 minutes 34 seconds, for an average of 11 seconds per optimization.
+I doubt using a GPU would give a significant speed-up, given that the configuration space is not very large, and hence the problem is not very parallel.
+
 
 %%FIXME - time to do an optimization
 %%FIXME - can this be extended to other ODEs?
