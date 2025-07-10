@@ -197,6 +197,52 @@ The location of an unstable fixed point will not always be at zero.
 To first locate the fixed points of the candidate ODE and treat them as special in a sweep-and-shoot procedure would be considerable additional algorithmic complexity.
 (In fact, taking the initiative to do so might be a good desideratum of an AI physicist!)
 
+\subsection{Differentiable ODE Solvers}
+
+Differentiable ODE solvers exist (e.g. \cite{torchdiffeq}), and instead of sweeping over the inital conditions we could instead differentiate the MSE of the sampled datapoints with respect to the initial conditions.
+This, combined with a suitable optimizer, might alleviate some of the problems discussed in section \ref{sec:sweep_and_shoot}. %FIXME - can I test this?
+
+However, the MSE of the dataset with respect to the initial conditions is not necessarily a convex fuction.
+The simplest way to demonstrate this is shown in figure \ref{fig:silly_oscillator_solns}, where we plot several solutions to
+$$
+\label{eq:silly_oscillator}
+\ddot{x}(t) = - \mathrm{sign} (x(t))
+$$
+and the (rather trivial) dataset $\left\{ (t_0=0, \tilde{x}_0=0), (t_1 = 1, \tilde{x}_1 = 0) \right\}$.
+The MSE of this dataset is zero whenever $x(0) = 0$ and $\dot{x}(0) = 1/2n$ for integer $n$.
+We have plotted the contours of the MSE as a function of the initial conditions in figure \ref{fig:Ldata_contours}.
+
+\begin{figure}
+\includegraphics{images/alternative_methods/silly_oscillator_solns.png}
+\centering
+\caption{
+Five solutions to $\ddot{x}(t) = -\mathrm{sign} (x(t))$ for $x(0) = 0$ and different values of $\dot{x}(0)$.
+Note that, for the pair of datapoints shown, two different initial conditions perfectly fit the data.
+}
+\label{fig:silly_oscillator_solns}
+\end{figure}
+
+\begin{figure}
+\includegraphics{images/alternative_methods/Ldata_contours.png}
+\centering
+\caption{
+Contours of the MSE of the dataset $\left\{ (t_0=0, \tilde{x}_0=0), (t_1 = 1, \tilde{x}_1 = 0) \right\}$ as a function of the initial conditions of $\ddot{x}(t) = -\mathrm{sign} (x(t))$ for $x(0) = 0$.
+We have highlighted the zeros at $x(0)=0$, $\dot{x}(0) = 1/2n$ for $n=\pm 1, \pm 2, \pm 3, \pm 8$ as red points.
+Note that the contour lines are not equally spaced in MSE.
+The point of this plot is not the value of the MSE, but the non-convex structure: there exist local minima.
+}
+\label{fig:Ldata_contours}
+\end{figure}
+
+Note that the nonlinearity of \eqref{eq:silly_oscillator} is necessary.
+Suppose that $x_1(t)$ and $x_2(t)$ are two solutions to the linear (not necessarilly homogeneous) equation
+$$
+\ddot{x}(t) + a(t) \dot{x}(t) + b(t) x(t) = c(t)
+$$
+Then $x_{\lambda}(t) = \lambda x_1(t) + (1-\lambda) x_2(t)$ is also a solution for any $\lambda$, including $\lambda \in \left[0, 1\right]$.
+Therefore the solution space of any linear ODE is a convex set, and since the MSE of the data is a convex function, its restriction to this space is still a convex function.
+
+
 \subsection{Relaxation methods}
 
 The method I describe below will look a bit like a relaxation method (see \cite{wikipediaRelaxationMethod}), and one might wonder if some variation of this could be used to achieve faster convergence.
