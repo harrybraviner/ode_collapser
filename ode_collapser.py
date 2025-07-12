@@ -77,6 +77,7 @@ def collapse_to_solution(
         idx_samples = torch.tensor(idx_samples, requires_grad=False)
     if not isinstance(x_samples, torch.Tensor):
         x_samples = torch.tensor(x_samples, requires_grad=False)
+    # FIXME - check that idx_samples are sorted. Else do dual-sort of idx_samples and x_samples
 
     # I believe this is necessary to avoid errors if we ever move the tensors to the gpu
     # (and to avoid a deprecation warning even if they are on the cpu).
